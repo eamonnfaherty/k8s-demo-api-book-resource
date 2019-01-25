@@ -7,5 +7,5 @@ EXPOSE 8000
 COPY requirements.txt /usr/src/app/
 RUN pip install -r requirements.txt
 
-COPY api.py /usr/src/app/
+COPY src/* /usr/src/app/
 CMD [ "hug", "-f", "api.py" ]

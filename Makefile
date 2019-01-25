@@ -2,7 +2,8 @@
 include default.properties
 
 test:
-	echo "testing passed"
+	mkdir -p reports
+	docker run --rm -v $$PWD/src:/code eeacms/pep8 | sed 's/\/code\//src\//'g > reports/pep8.out
 
 build:
 	docker build . -t $(docker.image_name)
