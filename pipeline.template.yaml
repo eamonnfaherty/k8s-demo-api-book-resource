@@ -82,26 +82,6 @@ Resources:
               OutputArtifacts:
                 - Name: !Ref ValidateProject
               RunOrder: 1
-        - Name: UpdatePipeline
-          Actions:
-            - Name: UpdatePipeline-Reload
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Version: 1
-                Provider: CloudFormation
-              Configuration:
-                ActionMode: CREATE_UPDATE
-                RoleArn: !GetAtt PipelineRole.Arn
-                StackName: !Sub "${AWS::StackName}"
-                TemplatePath: App::pipeline.template.yaml
-                Capabilities: CAPABILITY_NAMED_IAM
-                ParameterOverrides: !Sub '{"Owner": "${Owner}", "Repo": "${Repo}", "Branch": "${Branch}", "WebHookOAuthTokenSecretName": "${WebHookOAuthTokenSecretName}", "ProjectOAuthTokenSecretName": "${ProjectOAuthTokenSecretName}", "PipelineName": "${PipelineName}"}'
-              InputArtifacts:
-                - Name: App
-              OutputArtifacts:
-                - Name: !Sub "${AWS::StackName}-update"
-              RunOrder: 1
         - Name: TestProject
           Actions:
             - Name: !Ref TestProject
@@ -138,7 +118,7 @@ Resources:
     Properties:
       Name: !Sub "${AWS::StackName}-validate"
       Artifacts:
-        Type: CODEPIPELINE
+        Type: NO_ARTIFACTS
       Environment:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/ubuntu-base:14.04
@@ -168,7 +148,7 @@ Resources:
         Type: LINUX_CONTAINER
       ServiceRole: !GetAtt PipelineRole.Arn
       Source:
-        Type: NO_SOURCE
+        Type: CODEPIPELINE
         BuildSpec: |
           version: 0.2
           phases:
@@ -183,7 +163,7 @@ Resources:
     Properties:
       Name: !Sub "${AWS::StackName}-build"
       Artifacts:
-        Type: NO_SOURCE
+        Type: CODEPIPELINE
       Environment:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/docker:17.09.0
