@@ -145,7 +145,7 @@ Resources:
         Type: LINUX_CONTAINER
       ServiceRole: !GetAtt PipelineRole.Arn
       Source:
-        Type: CODEPIPELINE
+        Type: NO_SOURCE
         BuildSpec: |
           version: 0.2
           phases:
@@ -168,7 +168,7 @@ Resources:
         Type: LINUX_CONTAINER
       ServiceRole: !GetAtt PipelineRole.Arn
       Source:
-        Type: CODEPIPELINE
+        Type: NO_SOURCE
         BuildSpec: |
           version: 0.2
           phases:
@@ -183,7 +183,7 @@ Resources:
     Properties:
       Name: !Sub "${AWS::StackName}-build"
       Artifacts:
-        Type: CODEPIPELINE
+        Type: NO_SOURCE
       Environment:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/docker:17.09.0
