@@ -1,0 +1,222 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Pipeline for the building the api into a docker image in ECS
+
+Parameters:
+  Owner:
+    Type: String
+  Repo:
+    Type: String
+  Branch:
+    Type: String
+  WebHookOAuthTokenSecretName:
+    Type: String
+  ProjectOAuthTokenSecretName:
+    Type: String
+  PipelineName:
+    Type: String
+
+Resources:
+  PipelineBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      VersioningConfiguration:
+        Status: Enabled
+
+  Webhook:
+    Type: 'AWS::CodePipeline::Webhook'
+    Properties:
+      AuthenticationConfiguration:
+        SecretToken: !Sub "{{resolve:secretsmanager:${WebHookOAuthTokenSecretName}:SecretString}}"
+      Filters:
+        - JsonPath: "$.ref"
+          MatchEquals: !Sub "refs/heads/{Branch}"
+      Authentication: GITHUB_HMAC
+      TargetPipeline: !Ref CodePipeline
+      TargetAction: Source
+      Name: !Sub "${Owner}-${Repo}-${Branch}-webhook"
+      TargetPipelineVersion: !GetAtt CodePipeline.Version
+      RegisterWithThirdParty: 'true'
+
+
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Ref PipelineName
+      RoleArn: !GetAtt PipelineRole.Arn
+      ArtifactStore:
+        Location:
+          Ref:
+            PipelineBucket
+        Type: S3
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              Configuration:
+                Owner: !Ref Owner
+                Repo: !Ref Repo
+                Branch: !Ref Branch
+                OAuthToken: !Sub "{{resolve:secretsmanager:${ProjectOAuthTokenSecretName}:SecretString}}"
+              InputArtifacts: []
+              RunOrder: 1
+              OutputArtifacts:
+                - Name: App
+        - Name: PreDeployChecks
+          Actions:
+            - Name: !Ref ValidateProject
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref ValidateProject
+              InputArtifacts:
+                - Name: App
+              OutputArtifacts:
+                - Name: !Ref ValidateProject
+              RunOrder: 1
+        - Name: UpdatePipeline
+          Actions:
+            - Name: UpdatePipeline-Reload
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                RoleArn: !GetAtt PipelineRole.Arn
+                StackName: !Sub "${AWS::StackName}"
+                TemplatePath: App::pipeline.template.yaml
+                Capabilities: CAPABILITY_NAMED_IAM
+                ParameterOverrides: !Sub '{"Owner": "${Owner}", "Repo": "${Repo}", "Branch": "${Branch}", "WebHookOAuthTokenSecretName": "${WebHookOAuthTokenSecretName}", "ProjectOAuthTokenSecretName": "${ProjectOAuthTokenSecretName}", "PipelineName": "${PipelineName}"}'
+              InputArtifacts:
+                - Name: App
+              OutputArtifacts:
+                - Name: !Sub "${AWS::StackName}-update"
+              RunOrder: 1
+        - Name: TestProject
+          Actions:
+            - Name: !Ref TestProject
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref TestProject
+              InputArtifacts:
+                - Name: App
+              OutputArtifacts:
+                - Name: !Ref TestProject
+              RunOrder: 1
+        - Name: BuildProject
+          Actions:
+            - Name: !Ref BuildProject
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref BuildProject
+              InputArtifacts:
+                - Name: App
+              OutputArtifacts:
+                - Name: !Ref BuildProject
+              RunOrder: 1
+
+  ValidateProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AWS::StackName}-validate"
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/ubuntu-base:14.04
+        Type: LINUX_CONTAINER
+      ServiceRole: !GetAtt PipelineRole.Arn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - make validate
+          artifacts:
+            files: '**/*'
+
+
+  TestProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AWS::StackName}-test"
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/docker:17.09.0
+        Type: LINUX_CONTAINER
+      ServiceRole: !GetAtt PipelineRole.Arn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - make test
+          artifacts:
+            files: '**/*'
+
+  BuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AWS::StackName}-build"
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/docker:17.09.0
+        Type: LINUX_CONTAINER
+      ServiceRole: !GetAtt PipelineRole.Arn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - make build
+          artifacts:
+            files: '**/*'
+
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
