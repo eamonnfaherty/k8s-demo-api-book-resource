@@ -7,7 +7,7 @@ test:
 
 build:
 	docker build . -t $$(ECR_REPO):$$(CODEBUILD_SOURCE_VERSION)
-	$$(aws ecr get-login --no-include-email) && docker push $(ECR_REPO):$$(CODEBUILD_SOURCE_VERSION)
+	$$(aws ecr get-login --no-include-email) && docker push $$(ECR_REPO):$$(CODEBUILD_SOURCE_VERSION)
 
 validate:
 	aws cloudformation validate-template --template-body file://$(pipeline.template)
