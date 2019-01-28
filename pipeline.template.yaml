@@ -183,6 +183,7 @@ Resources:
           phases:
             build:
               commands:
+                - env
                 - make build
           artifacts:
             files: '**/*'
