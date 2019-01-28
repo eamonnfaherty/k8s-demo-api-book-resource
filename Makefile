@@ -6,7 +6,7 @@ test:
 	docker run --rm -v $$PWD/src:/code eeacms/pep8 | sed 's/\/code\//src\//'g > reports/pep8.out
 
 build:
-	docker build . -t $(ECR_REPO):$$(CODEBUILD_SOURCE_VERSION)
+	docker build . -t $$(ECR_REPO):$$(CODEBUILD_SOURCE_VERSION)
 	$$(aws ecr get-login --no-include-email) && docker push $(ECR_REPO):$$(CODEBUILD_SOURCE_VERSION)
 
 validate:
