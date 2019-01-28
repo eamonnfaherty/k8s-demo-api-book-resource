@@ -174,7 +174,9 @@ Resources:
         Image: aws/codebuild/docker:17.09.0
         Type: LINUX_CONTAINER
         EnvironmentVariables:
-          ECR_REPO: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Repo}"
+          -
+            Name: ECR_REPO
+            Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Repo}"
       ServiceRole: !GetAtt PipelineRole.Arn
       Source:
         Type: CODEPIPELINE
