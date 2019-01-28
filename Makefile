@@ -1,15 +1,13 @@
 .PHONEY: test build validate-pipeline create-pipeline update-pipeline delete-pipeline
 include default.properties
 
-ECR_REGISTRY="$(shell aws ssm get-parameter --name DockerRegistryURI --query 'Parameter.Value' --output text)"
-
 test:
 	mkdir -p reports
 	docker run --rm -v $$PWD/src:/code eeacms/pep8 | sed 's/\/code\//src\//'g > reports/pep8.out
 
 build:
-	docker build . -t $(ECR_REGISTRY):$(docker.image_name)
-	$$(aws ecr get-login --no-include-email) && docker push $(ECR_REGISTRY):$(docker.image_name)
+	docker build . -t $(ECR_REPO):$$(CODEBUILD_SOURCE_VERSION)
+	$$(aws ecr get-login --no-include-email) && docker push $(ECR_REPO):$$(CODEBUILD_SOURCE_VERSION)
 
 validate:
 	aws cloudformation validate-template --template-body file://$(pipeline.template)

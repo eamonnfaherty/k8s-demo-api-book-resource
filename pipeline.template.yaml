@@ -16,6 +16,11 @@ Parameters:
     Type: String
 
 Resources:
+  Registry:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref Repo
+
   PipelineBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -168,6 +173,8 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/docker:17.09.0
         Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          ECR_REPO: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Repo}"
       ServiceRole: !GetAtt PipelineRole.Arn
       Source:
         Type: CODEPIPELINE
