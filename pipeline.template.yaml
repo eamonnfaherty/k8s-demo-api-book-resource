@@ -186,6 +186,7 @@ Resources:
             build:
               commands:
                 - make build
+                - make package-helm-chart
           artifacts:
             files: '**/*'
 
