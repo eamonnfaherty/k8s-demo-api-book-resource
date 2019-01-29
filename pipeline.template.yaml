@@ -171,7 +171,7 @@ Resources:
         Type: CODEPIPELINE
       Environment:
         ComputeType: BUILD_GENERAL1_SMALL
-        Image: aws/codebuild/docker:17.09.0
+        Image: aws/codebuild/docker:18.09.0
         Type: LINUX_CONTAINER
         EnvironmentVariables:
           -
@@ -183,8 +183,16 @@ Resources:
         BuildSpec: |
           version: 0.2
           phases:
+            install:
+              commands:
+                - curl -SL https://storage.googleapis.com/kubernetes-helm/helm-v2.12.3-linux-386.tar.gz -o helm-v2.12.3-linux-386.tar.gz
+                - echo e4af54e7f448f56b3736be8be66de42b43a33595ec0bc92cd169bac97a9e72e9 helm-v2.12.3-linux-386.tar.gz | sha256sum -c -
+                - tar xfv helm-v2.12.3-linux-386.tar.gz
+                - export PATH=$PATH:${PWD}:linux-386/
+                - echo $PATH
             build:
               commands:
+                - echo $PATH
                 - make build
                 - make package-helm-chart
           artifacts:
